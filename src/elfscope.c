@@ -7,6 +7,96 @@
 #include <elf.h>
 
 
+const char *get_elf_class(uint8_t class) {
+    switch (class) {
+        case ELFCLASS32: return "32-bit";
+        case ELFCLASS64: return "64-bit";
+        default: return "Unknown";
+    }
+}
+
+const char *get_elf_data_encoding(uint8_t data) {
+    switch (data) {
+        case ELFDATA2LSB: return "Little Endian";
+        case ELFDATA2MSB: return "Big Endian";
+        default: return "Unknown";
+    }
+}
+
+const char *get_elf_version(uint8_t version) {
+    switch (version) {
+        case EV_NONE: return "Invalid";
+        case EV_CURRENT: return "Current";
+        default: return "Unknown";
+    }
+}
+
+const char *get_elf_OS_ABI(uint8_t os_abi) {
+    switch (os_abi) {
+        case ELFOSABI_SYSV: return "System V";
+        case ELFOSABI_HPUX: return "HP-UX";
+        case ELFOSABI_NETBSD: return "NetBSD";
+        case ELFOSABI_LINUX: return "Linux";
+        case ELFOSABI_SOLARIS: return "Solaris";
+        case ELFOSABI_AIX: return "AIX";
+        case ELFOSABI_IRIX: return "IRIX";
+        case ELFOSABI_FREEBSD: return "FreeBSD";
+        case ELFOSABI_TRU64: return "TRU64";
+        case ELFOSABI_MODESTO: return "Modesto";
+        case ELFOSABI_OPENBSD: return "OpenBSD";
+        default: return "Unknown";
+    }
+}
+
+const char *get_elf_OS_ABI_version(uint8_t version) {
+    switch (version) {
+        case 0: return "0 (System V)";
+        default: return "Unknown";
+    }
+}
+
+
+
+const char *get_elf_type(uint16_t type) {
+    switch (type) {
+        case ET_NONE: return "No file type";
+        case ET_REL: return "Relocatable file";
+        case ET_EXEC: return "Executable file";
+        case ET_DYN: return "Shared object file";
+        case ET_CORE: return "Core file";
+        default: return "Unknown";
+    }
+}
+
+const char *get_elf_machine(uint16_t machine) {
+    switch (machine) {
+        case EM_NONE: return "No machine";
+        case EM_386: return "Intel 80386";
+        case EM_AARCH64: return "AArch64";
+        case EM_MIPS: return "MIPS";
+        case EM_PARISC: return "PA-RISC";
+        case EM_SPARC32PLUS: return "SPARC v8+";
+        case EM_PPC: return "PowerPC";
+        case EM_PPC64: return "PowerPC 64-bit";
+        case EM_S390: return "IBM S/390";
+        case EM_ARM: return "ARM";
+        case EM_SH: return "SuperH";
+        case EM_SPARCV9: return "SPARC v9";
+        case EM_IA_64: return "Intel Itanium";
+        case EM_X86_64: return "AMD x86-64";
+        case EM_VAX: return "DEC VAX";
+        default: return "Unknown";
+    }
+}
+
+
+
+
+
+
+
+
+
 /*
  * get_segment_type - converts a program header p_type value
  * to a human readable string.
@@ -86,63 +176,28 @@ int main(int argc, char *argv[]) {
     }
         printf("Valid ELF file: %s\n", argv[1]);
 
-    /* e_ident[EI_CLASS] tells us whether this is a 32 or 64 bit binary
-     * ELFCLASS64 — 64-bit, ELFCLASS32 — 32-bit */
-    if (header->e_ident[EI_CLASS] == ELFCLASS64) {
-        printf("Architectural Class: 64-bit\n");
-    } else if (header->e_ident[EI_CLASS] == ELFCLASS32) {
-        printf("Architectural Class: 32-bit\n");
-    }
+
+    printf("Architectural Class:            %s\n", get_elf_class(header->e_ident[EI_CLASS]));               // EI_CLASS is the index in e_ident where the class byte is located
+    printf("Data Encoding:                  %s\n", get_elf_data_encoding(header->e_ident[EI_DATA]));        // EI_DATA is the index in e_ident where the data encoding byte is located
+    printf("ELF Version:                    %s\n", get_elf_version(header->e_ident[EI_VERSION]));           // EI_VERSION is the index in e_ident where the version byte is located
+    printf("OS ABI:                         %s\n", get_elf_OS_ABI(header->e_ident[EI_OSABI]));
+    printf("ABI Version:                    %s\n", get_elf_OS_ABI_version(header->e_ident[EI_ABIVERSION]));                 // EI_ABIVERSION is the index in e_ident where the ABI version byte is located
+    printf("File Type:                      %s\n", get_elf_type(header->e_type));                              // e_type is a field in Elf64_Ehdr that indicates the file type (executable, shared object, etc)
+    printf("Machine Architecture:           %s\n", get_elf_machine(header->e_machine));                        // e_machine is a field in Elf64_Ehdr that indicates the target architecture (x86, ARM, etc)
 
 
-    /* e_ident[EI_DATA] tells us the byte order of the binary
-     * ELFDATA2LSB — little endian (x86-64 is little endian)
-     * ELFDATA2MSB — big endian */
-    if (header->e_ident[EI_DATA] == ELFDATA2LSB) {
-        printf("Data Encoding: Little Endian\n");
-    } else if (header->e_ident[EI_DATA] == ELFDATA2MSB) {
-        printf("Data Encoding: Big Endian\n");
-    }
+    printf("Entry Point:                    0x%lx\n", (unsigned long)header->e_entry);                         // e_entry is the virtual address where execution starts when the program is loaded
+    printf("Program Header Table Offset:    0x%lx\n", (unsigned long)header->e_phoff);                      // e_phoff is the byte offset from the start of the file to the program header table        
+    printf("Section Header Table Offset:    0x%lx\n", (unsigned long)header->e_shoff);                      // e_shoff is the byte offset from the start of the file to the section header table    
+    printf("Flags:                          0x%x\n",  header->e_flags);                                     // e_flags is a field in Elf64_Ehdr that contains architecture-specific flags (often 0 for x86-64)
+    printf("ELF Header Size:                %u bytes\n", header->e_ehsize);                                 // e_ehsize is the size of the ELF header itself (should be 64 bytes for 64-bit ELF)
+    printf("Program Header Entry Size:      %u bytes\n", header->e_phentsize);                              // e_phentsize is the size of each entry in the program header table (should be 56 bytes for 64-bit ELF)   
+    printf("Section Header Entry Size:      %u bytes\n", header->e_shentsize);                              // e_shentsize is the size of each entry in the section header table (should be 64 bytes for 64-bit ELF)
+    printf("String Table Section Index:     %u\n",    header->e_shstrndx);                                  // e_shstrndx is the index of the section header that contains the string table for section names
+    printf("Total Sections:                 %u\n",    header->e_shnum);                                     // e_shnum is the total number of entries in the section header table   
+    printf("Total Segments:                 %u\n",    header->e_phnum);                    // e_phnum is the total number of entries in the program header table (i.e. total segments)  
 
 
-
-    /* e_type tells us what kind of ELF file this is
-     * ET_EXEC — standalone executable
-     * ET_DYN  — shared object or position independent executable (PIE)
-     * ET_REL  — relocatable object file (.o file)
-     * ET_CORE — core dump */
-
-    uint64_t type = header->e_type;
-
-    switch (type) {
-        case ET_EXEC:
-            printf("File Type: Executable\n");
-            break;
-        case ET_DYN:
-            printf("File Type: Shared Object\n");
-            break;
-        case ET_REL:
-            printf("File Type: Relocatable\n");
-            break;
-        case ET_CORE:
-            printf("File Type: Core Dump\n");
-            break;    
-        default:
-            printf("File Type: Unknown\n");
-    }
-
-     /* e_entry — the virtual address where execution begins
-     * this is where the kernel jumps after loading the binary */
-    printf("Entry Point (Virtual Address): 0x%lx\n",
-           (unsigned long)header->e_entry);
-
-    /* e_shnum — total number of section headers in this binary */
-    uint32_t total_sections = header->e_shnum;
-    printf("Total Sections: %u\n", total_sections);
-
-    /* e_phnum — total number of program headers (segments) in this binary */
-    uint32_t total_segments = header->e_phnum;
-    printf("Total Segments: %u\n", total_segments);
 
     /* navigate to the program header table
      * e_phoff is the byte offset from the start of the file
@@ -150,7 +205,7 @@ int main(int argc, char *argv[]) {
     Elf64_Phdr *program_headers = (Elf64_Phdr *)(map + header->e_phoff);
 
     printf("\nProgram Headers:\n");
-    for (uint32_t i = 0; i < total_segments; i++) {
+    for (uint32_t i = 0; i < header->e_phnum; i++) {
         printf("Segment %u:\n", i);
 
         /* p_type — what kind of segment this is (LOAD, DYNAMIC, etc)
