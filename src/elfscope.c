@@ -7,6 +7,16 @@
 #include <elf.h>
 
 
+
+
+
+
+
+
+/*
+ * get_elf_class - converts an ELF class value to a human readable string.
+ * class is a raw integer in Elf64_Ehdr — this function maps it to the standard class name.
+ */
 const char *get_elf_class(uint8_t class) {
     switch (class) {
         case ELFCLASS32: return "32-bit";
@@ -15,6 +25,11 @@ const char *get_elf_class(uint8_t class) {
     }
 }
 
+
+/*
+ * get_elf_data_encoding - converts an ELF data encoding value to a human readable string.
+ * data is a raw integer in Elf64_Ehdr — this function maps it to the standard data encoding name.
+ */
 const char *get_elf_data_encoding(uint8_t data) {
     switch (data) {
         case ELFDATA2LSB: return "Little Endian";
@@ -23,6 +38,10 @@ const char *get_elf_data_encoding(uint8_t data) {
     }
 }
 
+/*  
+ * get_elf_version - converts an ELF version value to a human readable string.
+ * version is a raw integer in Elf64_Ehdr — this function maps it to the standard version name.
+ */
 const char *get_elf_version(uint8_t version) {
     switch (version) {
         case EV_NONE: return "Invalid";
@@ -31,6 +50,10 @@ const char *get_elf_version(uint8_t version) {
     }
 }
 
+/*
+ * get_elf_OS_ABI - converts an ELF OS/ABI value to a human readable string.
+ * os_abi is a raw integer in Elf64_Ehdr — this function maps it to the standard OS/ABI name.
+ */
 const char *get_elf_OS_ABI(uint8_t os_abi) {
     switch (os_abi) {
         case ELFOSABI_SYSV: return "System V";
@@ -56,7 +79,10 @@ const char *get_elf_OS_ABI_version(uint8_t version) {
 }
 
 
-
+/*
+ * get_elf_type - converts an ELF type value to a human readable string.
+ * type is a raw integer in Elf64_Ehdr — this function maps it to the standard file type name.
+ */
 const char *get_elf_type(uint16_t type) {
     switch (type) {
         case ET_NONE: return "No file type";
@@ -68,6 +94,10 @@ const char *get_elf_type(uint16_t type) {
     }
 }
 
+/*
+ * get_elf_machine - converts an ELF machine value to a human readable string.
+ * machine is a raw integer in Elf64_Ehdr — this function maps it to the standard architecture name.
+ */
 const char *get_elf_machine(uint16_t machine) {
     switch (machine) {
         case EM_NONE: return "No machine";
@@ -89,14 +119,6 @@ const char *get_elf_machine(uint16_t machine) {
     }
 }
 
-
-
-
-
-
-
-
-
 /*
  * get_segment_type - converts a program header p_type value
  * to a human readable string.
@@ -112,9 +134,73 @@ const char *get_segment_type(uint32_t type) {
         case PT_NOTE: return "NOTE";
         case PT_SHLIB: return "SHLIB";
         case PT_PHDR: return "PHDR";
+        case PT_LOPROC: return "LOPROC";
+        case PT_HIPROC: return "HIPROC";
+        case PT_GNU_STACK: return "GNU_STACK";
         default: return "UNKNOWN";
     }
 }
+/*
+* get_segment_flags - converts a program header p_flags value
+* to a human readable string.
+* p_flags is a raw integer in Elf64_Phdr — this function
+* maps it to the standard flag name.
+*/
+const char *get_segment_flags(uint32_t flags) {
+    static char buffer[4]; // Enough to hold "RWE" + null terminator
+    int pos = 0;
+
+    if (flags & PF_R) buffer[pos++] = 'R';
+    if (flags & PF_W) buffer[pos++] = 'W';
+    if (flags & PF_X) buffer[pos++] = 'E';
+    buffer[pos] = '\0'; // Null-terminate the string
+
+    return buffer;
+}
+
+/* 
+ * get_section_type - converts a section header sh_type value
+ * to a human readable string.
+ * sh_type is a raw integer in Elf64_Shdr — this function
+ * maps it to the standard section name.
+ */
+const char *get_section_type(uint32_t type) {
+    switch (type) {
+        case SHT_NULL: return "NULL";
+        case SHT_PROGBITS: return "PROGBITS";
+        case SHT_SYMTAB: return "SYMTAB";
+        case SHT_STRTAB: return "STRTAB";
+        case SHT_RELA: return "RELA";
+        case SHT_HASH: return "HASH";
+        case SHT_DYNAMIC: return "DYNAMIC";
+        case SHT_NOTE: return "NOTE";
+        case SHT_NOBITS: return "NOBITS";
+        case SHT_LOPROC: return "LOPROC";
+        case SHT_HIPROC: return "HIPROC";
+        default: return "UNKNOWN";
+    }
+}
+
+/*
+ * get_section_flags - converts a section header sh_flags value
+ * to a human readable string.
+ * sh_flags is a raw integer in Elf64_Shdr — this function
+ * maps it to the standard flag name.
+ */
+const char *get_section_flags(uint64_t flags) {
+    static char buffer[5]; // Enough to hold "WAXS" + null terminator
+    int pos = 0;
+
+    if (flags & SHF_WRITE) buffer[pos++] = 'W';
+    if (flags & SHF_ALLOC) buffer[pos++] = 'A';
+    if (flags & SHF_EXECINSTR) buffer[pos++] = 'X';
+    if (flags & SHF_MASKPROC) buffer[pos++] = 'S';
+
+    buffer[pos] = '\0'; // Null-terminate the string
+
+    return buffer;
+}
+
 
 
 int main(int argc, char *argv[]) {
@@ -205,42 +291,54 @@ int main(int argc, char *argv[]) {
     Elf64_Phdr *program_headers = (Elf64_Phdr *)(map + header->e_phoff);
 
     printf("\nProgram Headers:\n");
+
     for (uint32_t i = 0; i < header->e_phnum; i++) {
-        printf("Segment %u:\n", i);
+        printf("\nSegment %u:\n", i);
 
-        /* p_type — what kind of segment this is (LOAD, DYNAMIC, etc)
-         * get_segment_type converts the raw integer to a readable string */
-        printf("  Type:             %s\n",
-               get_segment_type(program_headers[i].p_type));
-
-        /* p_offset — byte offset of this segment from start of file */
-        printf("  Offset:           0x%lx\n", program_headers[i].p_offset);
-
-        /* p_vaddr — virtual address where this segment is loaded in memory */
-        printf("  Virtual Address:  0x%lx\n", program_headers[i].p_vaddr);
-
-        /* p_paddr — physical address, relevant on embedded systems
-         * on Linux this is usually the same as p_vaddr */
-        printf("  Physical Address: 0x%lx\n", program_headers[i].p_paddr);
-
-        /* p_filesz — size of the segment in the file
-         * p_memsz  — size of the segment in memory
-         * p_memsz can be larger than p_filesz — the difference is
-         * zero-initialized at load time (this is how .bss works) */
-        printf("  File Size:        %lu bytes\n", program_headers[i].p_filesz);
-        printf("  Memory Size:      %lu bytes\n", program_headers[i].p_memsz);
-
-        /* p_flags — permissions for this segment
-         * PF_R=4 (read), PF_W=2 (write), PF_X=1 (execute)
-         * a LOAD segment with flags 0x5 is readable and executable (.text)
-         * a LOAD segment with flags 0x6 is readable and writable (.data) */
-        printf("  Flags:            0x%x\n", program_headers[i].p_flags);
-
-        /* p_align — memory alignment requirement for this segment
-         * PT_LOAD segments are typically aligned to 0x200000 (2MB) */
-        printf("  Alignment:        %lu\n", program_headers[i].p_align);
+        printf("Type:                       %s (0x%x)\n", get_segment_type(program_headers[i].p_type), program_headers[i].p_type);
+        printf("Offset:                     0x%lx\n", program_headers[i].p_offset);
+        printf("Virtual Address:            0x%lx\n", program_headers[i].p_vaddr);
+        printf("Physical Address:           0x%lx\n", program_headers[i].p_paddr);
+        printf("File Size:                  %lu bytes\n", program_headers[i].p_filesz);
+        printf("Memory Size:                %lu bytes\n", program_headers[i].p_memsz);
+        printf("Flags (R/W/X):              %s (0x%x)\n", get_segment_flags(program_headers[i].p_flags), program_headers[i].p_flags);
+        printf("Alignment:                  %lu\n", program_headers[i].p_align);
 
     }
+
+    /* navigate to the section header table 
+     * e_shoff is the byte offset from the start of the file
+     * casting map + e_shoff to Elf64_Shdr* gives us the array of sections */
+    Elf64_Shdr *section_headers = (Elf64_Shdr *)(map + header->e_shoff);
+
+    printf("\nSection Headers:\n");
+
+    /*
+     * find the string table using e_shstrndx 
+     * this sections's data is a flat array of a null-terminated strings
+     * every section's sh_name is an offset into this array
+     */
+
+    Elf64_Shdr *string_table = &section_headers[header->e_shstrndx];
+    char *string_data = (char *)(map + string_table->sh_offset);
+
+    for (uint16_t i = 0; i < header->e_shnum; i++) {
+        printf("\nSection %u:\n", i);
+
+        printf("Name:                       %s\n", string_data + section_headers[i].sh_name);                                                 // sh_name is a field in Elf64_Shdr that is an offset into the section header string table, giving the name of the section
+        printf("Type:                       %s (0x%x)\n", get_section_type(section_headers[i].sh_type), section_headers[i].sh_type);          // sh_type is a field in Elf64_Shdr that indicates the type of the section (code, data, symbol table, etc)
+        printf("Flags:                      %s (0x%lx)\n", get_section_flags(section_headers[i].sh_flags), section_headers[i].sh_flags);      // sh_flags is a field in Elf64_Shdr that contains flags for the section (writable, executable, etc)
+        printf("Address:                    0x%lx\n", section_headers[i].sh_addr);                                                            // sh_addr is the virtual address of the section in memory when loaded
+        printf("Offset:                     0x%lx\n", section_headers[i].sh_offset);                                          // sh_offset is the byte offset from the start of the file to the section's data    
+        printf("Size:                       %lu bytes\n", section_headers[i].sh_size);                                                        // sh_size is the size of the section's data in bytes   
+        printf("Link:                       %u\n", section_headers[i].sh_link);                                      // sh_link is a field in Elf64_Shdr that has different meanings depending on the section type (e.g. index of related section)
+        printf("Info:                       %lu\n", (unsigned long)section_headers[i].sh_info);                                      // sh_info is a field in Elf64_Shdr that has different meanings depending on the section type (e.g. number of symbols in a symbol table)
+        printf("Address Align:              %lu\n", section_headers[i].sh_addralign);                                           // sh_addralign is the required alignment of the section in memory (e.g. 16 for code sections)    
+        printf("Entry Size:                 %lu bytes\n", section_headers[i].sh_entsize);                                              // sh_entsize is the size of each entry in the section if it contains fixed-size entries (e.g. symbol table entries)
+
+    }
+
+
 
     munmap(map, file_info.st_size);
 
