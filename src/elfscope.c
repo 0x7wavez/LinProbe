@@ -140,6 +140,29 @@ const char *get_segment_type(uint32_t type) {
         default: return "UNKNOWN";
     }
 }
+
+const char *get_symbol_type(unsigned char info) {
+    switch (ELF64_ST_TYPE(info)) {
+        case STT_NOTYPE:  return "NOTYPE";
+        case STT_OBJECT:  return "OBJECT";
+        case STT_FUNC:    return "FUNC";
+        case STT_SECTION: return "SECTION";
+        case STT_FILE:    return "FILE";
+        default:          return "UNKNOWN";
+    }
+}
+
+const char *get_symbol_binding(unsigned char info) {
+    switch (ELF64_ST_BIND(info)) {
+        case STB_LOCAL:  return "LOCAL";
+        case STB_GLOBAL: return "GLOBAL";
+        case STB_WEAK:   return "WEAK";
+        default:         return "UNKNOWN";
+    }
+}
+
+
+
 /*
 * get_segment_flags - converts a program header p_flags value
 * to a human readable string.
@@ -177,6 +200,7 @@ const char *get_section_type(uint32_t type) {
         case SHT_NOBITS: return "NOBITS";
         case SHT_LOPROC: return "LOPROC";
         case SHT_HIPROC: return "HIPROC";
+        case SHT_DYNSYM: return "DYNSYM";
         default: return "UNKNOWN";
     }
 }
@@ -309,7 +333,7 @@ int main(int argc, char *argv[]) {
     /* navigate to the section header table 
      * e_shoff is the byte offset from the start of the file
      * casting map + e_shoff to Elf64_Shdr* gives us the array of sections */
-    Elf64_Shdr *section_headers = (Elf64_Shdr *)(map + header->e_shoff);
+    Elf64_Shdr *section_headers = (Elf64_Shdr *)(map + header->e_shoff); 
 
     printf("\nSection Headers:\n");
 
@@ -319,13 +343,13 @@ int main(int argc, char *argv[]) {
      * every section's sh_name is an offset into this array
      */
 
-    Elf64_Shdr *string_table = &section_headers[header->e_shstrndx];
-    char *string_data = (char *)(map + string_table->sh_offset);
+    Elf64_Shdr *strtab= &section_headers[header->e_shstrndx];    // The section header for the string table that contains section names
+    char *strdata = (char *)(map + strtab->sh_offset);          // The string data for the section names
 
     for (uint16_t i = 0; i < header->e_shnum; i++) {
         printf("\nSection %u:\n", i);
 
-        printf("Name:                       %s\n", string_data + section_headers[i].sh_name);                                                 // sh_name is a field in Elf64_Shdr that is an offset into the section header string table, giving the name of the section
+        printf("Name:                       %s\n", strdata + section_headers[i].sh_name);                                                 // sh_name is a field in Elf64_Shdr that is an offset into the section header string table, giving the name of the section
         printf("Type:                       %s (0x%x)\n", get_section_type(section_headers[i].sh_type), section_headers[i].sh_type);          // sh_type is a field in Elf64_Shdr that indicates the type of the section (code, data, symbol table, etc)
         printf("Flags:                      %s (0x%lx)\n", get_section_flags(section_headers[i].sh_flags), section_headers[i].sh_flags);      // sh_flags is a field in Elf64_Shdr that contains flags for the section (writable, executable, etc)
         printf("Address:                    0x%lx\n", section_headers[i].sh_addr);                                                            // sh_addr is the virtual address of the section in memory when loaded
@@ -336,7 +360,48 @@ int main(int argc, char *argv[]) {
         printf("Address Align:              %lu\n", section_headers[i].sh_addralign);                                           // sh_addralign is the required alignment of the section in memory (e.g. 16 for code sections)    
         printf("Entry Size:                 %lu bytes\n", section_headers[i].sh_entsize);                                              // sh_entsize is the size of each entry in the section if it contains fixed-size entries (e.g. symbol table entries)
 
+
     }
+
+    /* Find the dynamic symbol table and its associated string table */
+    uint16_t dynsym_index = 0;
+    for (uint16_t i = 0; i < header->e_shnum; i++) {
+        if (section_headers[i].sh_type == SHT_DYNSYM) {
+            dynsym_index = i;
+            break;
+        }
+    }
+
+    Elf64_Shdr *dynsym = &section_headers[dynsym_index];
+    Elf64_Shdr *dynstr = &section_headers[dynsym->sh_link];         // The linked string table for the dynamic symbols
+    char *sym_names = (char *)(map + dynstr->sh_offset);            // The string data for the dynamic symbols
+
+    printf("\n.dynsym found at section index:             %u\n", dynsym_index);
+    printf("sh_offset:                                  0x%lx\n", dynsym->sh_offset);
+    printf("sh_size:                                    %lu bytes\n", dynsym->sh_size);
+    printf("sh_entsize:                                 %lu bytes\n", dynsym->sh_entsize);
+    printf("sh_link:                                    %u\n", dynsym->sh_link);
+
+
+
+    Elf64_Sym *symbols = (Elf64_Sym *)(map + dynsym->sh_offset); 
+
+
+    printf("\nSymbol Table (.dynsym)  — %lu symbols:\n\n", dynsym->sh_size / dynsym->sh_entsize);  // Tells us how many symbols there are by dividing the total size of the .dynsym section by the size of each symbol entry
+
+    for (uint64_t i = 0; i < dynsym->sh_size / dynsym->sh_entsize; i++) {
+        /* st_name is an offset into sym names (the .dynstr section)
+         * same mechanic as sh_name into shstrtab */
+
+        char *name = sym_names + symbols[i].st_name;  // Get the symbol name from the string table using st_name as an offset
+
+
+        printf("[%3lu]  0x%016lx  %-8s  %-7s  %s\n", i, symbols[i].st_value, get_symbol_binding(symbols[i].st_info), get_symbol_type(symbols[i].st_info), name);
+
+    }
+    
+
+    
 
 
 
