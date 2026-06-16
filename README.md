@@ -84,5 +84,7 @@ Active development.
 ## Author
 
 wavez — Linux systems programmer
+
 X: @0x7wavez
+
 Linkedin: Nwadi Favour Chukwuka
