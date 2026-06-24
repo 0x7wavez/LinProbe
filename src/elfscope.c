@@ -226,6 +226,45 @@ const char *get_section_flags(uint64_t flags) {
 }
 
 
+/*
+ * get_dynamic_tag - converts a dynamic section d_tag value
+ * to a human readable string.
+ * d_tag is a raw integer in Elf64_Dyn — this function
+ * maps it to the standard tag name.
+ */
+const char *get_dynamic_tag(Elf64_Sxword tag) {
+    switch (tag) {
+        case DT_NEEDED:   return "NEEDED";
+        case DT_PLTGOT:   return "PLTGOT";
+        case DT_STRTAB:   return "STRTAB";
+        case DT_SYMTAB:   return "SYMTAB";
+        case DT_RELA:     return "RELA";
+        case DT_RELAENT:  return "RELAENT";
+        case DT_RELASZ: return "RELASIZE";
+        case DT_SONAME:   return "SONAME";
+        case DT_INIT:     return "INIT";
+        case DT_FINI:     return "FINI";
+        case DT_DEBUG:    return "DEBUG";
+        case DT_NULL:     return "NULL";
+        case DT_INIT_ARRAY:   return "INIT_ARRAY";
+        case DT_FINI_ARRAY:   return "FINI_ARRAY";
+        case DT_INIT_ARRAYSZ: return "INIT_ARRAYSZ";
+        case DT_FINI_ARRAYSZ: return "FINI_ARRAYSZ";
+        case DT_GNU_HASH:     return "GNU_HASH";
+        case DT_VERSYM:       return "VERSYM";
+        case DT_VERNEED:      return "VERNEED";
+        case DT_VERNEEDNUM:   return "VERNEEDNUM";
+        case DT_PLTRELSZ:     return "PLTRELSZ";
+        case DT_PLTREL:       return "PLTREL";
+        case DT_JMPREL:       return "JMPREL";
+        case DT_FLAGS:        return "FLAGS";
+        case DT_FLAGS_1:      return "FLAGS_1";
+        case DT_RELACOUNT:    return "RELACOUNT";
+        default:          return "UNKNOWN";
+    }
+}
+
+
 
 int main(int argc, char *argv[]) {
     if (argc < 2) {
@@ -248,6 +287,17 @@ int main(int argc, char *argv[]) {
         close(fd);
         return EXIT_FAILURE;
     }
+
+
+    /* a valid ELF file must be at least 64 bytes
+     * the ELF header alone is 64 bytes — anything smaller
+     * cannot be a valid ELF file and would cause us to read
+     * garbage when we cast map to Elf64_Ehdr */
+    if (file_info.st_size < (off_t)sizeof(Elf64_Ehdr)) {
+        fprintf(stderr, "Error: file too small to be an ELF file\n");
+    close(fd);
+    return EXIT_FAILURE;
+}
 
 
     /* mmap maps the entire file into our process's virtual address space
@@ -320,7 +370,7 @@ int main(int argc, char *argv[]) {
         printf("\nSegment %u:\n", i);
 
         printf("Type:                       %s (0x%x)\n", get_segment_type(program_headers[i].p_type), program_headers[i].p_type);
-        printf("Offset:                     0x%lx\n", program_headers[i].p_offset);
+        printf("Offset:                     0x%lx\n", program_headers[i].p_offset);     
         printf("Virtual Address:            0x%lx\n", program_headers[i].p_vaddr);
         printf("Physical Address:           0x%lx\n", program_headers[i].p_paddr);
         printf("File Size:                  %lu bytes\n", program_headers[i].p_filesz);
@@ -365,40 +415,96 @@ int main(int argc, char *argv[]) {
 
     /* Find the dynamic symbol table and its associated string table */
     uint16_t dynsym_index = 0;
+    int dynsym_found = 0;
     for (uint16_t i = 0; i < header->e_shnum; i++) {
         if (section_headers[i].sh_type == SHT_DYNSYM) {
             dynsym_index = i;
+            dynsym_found = 1;
             break;
         }
     }
 
-    Elf64_Shdr *dynsym = &section_headers[dynsym_index];
-    Elf64_Shdr *dynstr = &section_headers[dynsym->sh_link];         // The linked string table for the dynamic symbols
-    char *sym_names = (char *)(map + dynstr->sh_offset);            // The string data for the dynamic symbols
+    if (!dynsym_found) {
+        printf("\nNo .dynsym section found (binary may be statically linked)\n");
+    } else {
+        Elf64_Shdr *dynsym = &section_headers[dynsym_index];
+        Elf64_Shdr *dynstr = &section_headers[dynsym->sh_link];         // The linked string table for the dynamic symbols
+        char *sym_names = (char *)(map + dynstr->sh_offset);            // The string data for the dynamic symbols
 
-    printf("\n.dynsym found at section index:             %u\n", dynsym_index);
-    printf("sh_offset:                                  0x%lx\n", dynsym->sh_offset);
-    printf("sh_size:                                    %lu bytes\n", dynsym->sh_size);
-    printf("sh_entsize:                                 %lu bytes\n", dynsym->sh_entsize);
-    printf("sh_link:                                    %u\n", dynsym->sh_link);
+        printf("\n.dynsym found at section index:             %u\n", dynsym_index);
+        printf("sh_offset:                                  0x%lx\n", dynsym->sh_offset);
+        printf("sh_size:                                    %lu bytes\n", dynsym->sh_size);
+        printf("sh_entsize:                                 %lu bytes\n", dynsym->sh_entsize);
+        printf("sh_link:                                    %u\n", dynsym->sh_link);
 
+        Elf64_Sym *symbols = (Elf64_Sym *)(map + dynsym->sh_offset);
+        uint64_t num_symbols = dynsym->sh_size / dynsym->sh_entsize;
 
+        printf("\nSymbol Table (.dynsym)  — %lu symbols:\n\n", num_symbols);  // Tells us how many symbols there are by dividing the total size of the .dynsym section by the size of each symbol entry
 
-    Elf64_Sym *symbols = (Elf64_Sym *)(map + dynsym->sh_offset); 
+        for (uint64_t i = 0; i < num_symbols; i++) {
+            /* st_name is an offset into sym names (the .dynstr section)
+             * same mechanic as sh_name into shstrtab */
 
-
-    printf("\nSymbol Table (.dynsym)  — %lu symbols:\n\n", dynsym->sh_size / dynsym->sh_entsize);  // Tells us how many symbols there are by dividing the total size of the .dynsym section by the size of each symbol entry
-
-    for (uint64_t i = 0; i < dynsym->sh_size / dynsym->sh_entsize; i++) {
-        /* st_name is an offset into sym names (the .dynstr section)
-         * same mechanic as sh_name into shstrtab */
-
-        char *name = sym_names + symbols[i].st_name;  // Get the symbol name from the string table using st_name as an offset
-
-
-        printf("[%3lu]  0x%016lx  %-8s  %-7s  %s\n", i, symbols[i].st_value, get_symbol_binding(symbols[i].st_info), get_symbol_type(symbols[i].st_info), name);
-
+            char *name = sym_names + symbols[i].st_name;  // Get the symbol name from the string table using st_name as an offset
+            printf("[%3lu]  0x%016lx  %-8s  %-7s  %s\n", i, symbols[i].st_value, get_symbol_binding(symbols[i].st_info), get_symbol_type(symbols[i].st_info), name);
+        }
     }
+
+    /* The .dynamic section is a flat array of Elf64_Dyn entries.
+     * Each entry is a tag-value pair. The array ends at DT_NULL.
+     * It tells us what shared libraries this binary needs,
+     * where the GOT is, and where the symbol/string tables are. */
+
+    /* find the .dynamic section by looping through section headers */
+    Elf64_Shdr *dynamic_section = NULL;
+    for (uint16_t i = 0; i < header->e_shnum; i++) {
+        if (section_headers[i].sh_type == SHT_DYNAMIC) {
+        dynamic_section = &section_headers[i];
+        break;
+        }
+    }
+    
+
+    if (dynamic_section == NULL) {
+        fprintf(stderr, "No .dynamic section found\n");
+        munmap(map, file_info.st_size);
+        return EXIT_FAILURE;
+    }
+
+    /* get the string table for DT_NEEDED names
+     * sh_link on .dynamic points to .dynstr — same pattern as .dynsym */
+    Elf64_Shdr *dyn_strtab  = &section_headers[dynamic_section->sh_link];
+    char       *dyn_strings = (char *)(map + dyn_strtab->sh_offset);
+
+    
+
+    /* cast the section data to an array of Elf64_Dyn entries */
+    Elf64_Dyn *dyn_entries = (Elf64_Dyn *)(map + dynamic_section->sh_offset);
+
+
+    printf("\nDynamic Section:\n");
+
+
+
+
+    for (uint64_t i = 0; dyn_entries[i].d_tag != DT_NULL; i++) {
+    Elf64_Dyn entry = dyn_entries[i];
+
+    /* DT_NEEDED is special — its value is a string offset
+     * everything else is either an address or a number */
+    if (entry.d_tag == DT_NEEDED) {
+        printf("  %-12s  %s\n",
+               get_dynamic_tag(entry.d_tag),
+               dyn_strings + entry.d_un.d_val);
+    } else {
+        printf("  %-12s  0x%lx\n",
+               get_dynamic_tag(entry.d_tag),
+               entry.d_un.d_ptr);
+    }
+}
+
+
     
 
     
