@@ -1,0 +1,9 @@
+# builds artifacts
+bin/
+trace
+*.o
+*.out
+
+# editor/OS junk
+*.swp
+.DS_Store
