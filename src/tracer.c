@@ -31,7 +31,7 @@ void run_child_process(char* commands, char** args) {
 
 void trace_target(TracerContext* ctx) {
     int status;
-    waitpid(ctx->target_pid, &status, 0);
+    waitpid(ctx->target_pid, &status, 0);  
 
     if(!WIFSTOPPED(status)) {
         fprintf(stderr, "Child process did not stop as expected.\n");
@@ -43,7 +43,7 @@ void trace_target(TracerContext* ctx) {
 
     ptrace(PTRACE_CONT, ctx->target_pid, NULL, NULL);
 
-    waitpid(ctx->target_pid, &status, 0);
+    waitpid(ctx->target_pid, &status, 0); 
 
     
 }
