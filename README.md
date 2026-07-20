@@ -27,7 +27,7 @@ stripped-down servers, embedded Linux systems.
 
 | Module   | Description                     | Status         |
 |----------|---------------------------------|----------------|
-| elfscope | ELF binary parser (no libelf)   | 🔨 in progress |
+| elfscope | ELF binary parser (no libelf)   | ✅ completed
 | tracer   | ptrace syscall interceptor      | ⬜ upcoming    |
 | memmap   | process memory region dumper    | ⬜ upcoming    |
 | rawnet   | raw socket network probe        | ⬜ upcoming    |
@@ -84,7 +84,5 @@ Active development.
 ## Author
 
 wavez — Linux systems programmer
-
 X: @0x7wavez
-
 Linkedin: Nwadi Favour Chukwuka
